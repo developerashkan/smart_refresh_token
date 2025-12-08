@@ -1,8 +1,15 @@
-## 0.0.2
+## [0.0.3] - 2025-11-27
+### Added
+- Dynamic retry logic (configurable backoff, max attempts).
+- Comprehensive examples demonstrating refresh + retry flows.
+- New `RetryConfig` for runtime retry customization.
 
-# Changelog
+### Improved
+- More stable token refresh interceptor.
+- Clearer documentation and example structure.
 
-All notable changes to this package will be documented in this file.
+### Fixed
+- Missing platform folders in example project.
 
 ## [0.0.2] - 2025-10-08
 ### Added

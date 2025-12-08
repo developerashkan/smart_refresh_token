@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:smart_refresh_token/example/main.dart';
 import 'package:smart_refresh_token/smart_refresh_token.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../example/lib/main.dart';
 
 void main() {
   test('SecureTokenStorage write and read', () async {
@@ -25,7 +26,9 @@ void main() {
   });
 
   test('RefreshTokenInterceptor initializes correctly', () {
-    final tokenStorage = SecureTokenStorage(secureStorage: FlutterSecureStorage());
+    final tokenStorage = SecureTokenStorage(
+      secureStorage: FlutterSecureStorage(),
+    );
     final interceptor = RefreshTokenInterceptor(
       tokenStorage: tokenStorage,
       tokenRefresher: (token, client) async => null,
