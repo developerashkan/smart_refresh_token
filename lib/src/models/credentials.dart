@@ -85,7 +85,7 @@ class Credentials extends Equatable {
       refreshTokenExpireAt: json['refreshTokenExpireAt'] != null
           ? DateTime.parse(json['refreshTokenExpireAt'] as String).toUtc()
           : null,
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      metadata: (json['metadata'] as Map?)?.cast<String, dynamic>(),
     );
   }
 
@@ -100,8 +100,13 @@ class Credentials extends Equatable {
 
   @override
   String toString() {
-    return 'Credentials(accessToken: ${accessToken.substring(0, 10)}..., '
-        'refreshToken: ${refreshToken.substring(0, 10)}..., '
+    String mask(String value) {
+      if (value.length <= 10) return value;
+      return '${value.substring(0, 10)}...';
+    }
+
+    return 'Credentials(accessToken: ${mask(accessToken)}, '
+        'refreshToken: ${mask(refreshToken)}, '
         'accessTokenExpireAt: $accessTokenExpireAt, '
         'refreshTokenExpireAt: $refreshTokenExpireAt)';
   }

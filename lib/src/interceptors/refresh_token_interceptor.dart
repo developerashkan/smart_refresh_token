@@ -1,27 +1,38 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:synchronized/synchronized.dart';
-import '../models/credentials.dart';
-import '../models/retry_config.dart';
-import '../models/refresh_config.dart';
-import '../storage/token_storage.dart';
-import '../utils/retry_policy.dart';
-import '../utils/logger.dart';
 
-/// Callback type for token refresh
+import '../models/credentials.dart';
+import '../models/refresh_config.dart';
+import '../models/retry_config.dart';
+import '../storage/token_storage.dart';
+import '../utils/logger.dart';
+import '../utils/retry_policy.dart';
+
+/// Callback type for token refresh.
 typedef TokenRefresher =
     Future<Credentials?> Function(String refreshToken, Dio client);
 
-/// Callback type for authentication failure
+/// Callback type for authentication failure.
 typedef OnAuthFailure = FutureOr<void> Function();
 
-/// Advanced Dio interceptor for automatic token refresh with retry logic
+/// Advanced Dio interceptor for automatic token refresh with retry logic.
 class RefreshTokenInterceptor extends Interceptor {
+  /// Add this key to `RequestOptions.extra` to skip auth for a request.
+  static const String skipAuthKey = 'skipAuth';
+
   final TokenStorage tokenStorage;
   final TokenRefresher tokenRefresher;
   final OnAuthFailure onAuthFailure;
+
+  /// Optional dedicated Dio used for refresh requests.
   final Dio? refreshDio;
+
+  /// Optional dedicated Dio used for retries.
+  final Dio? retryDio;
+
   final RefreshConfig refreshConfig;
   final RetryConfig retryConfig;
   final RefreshTokenLogger logger;
@@ -33,6 +44,7 @@ class RefreshTokenInterceptor extends Interceptor {
     required this.tokenRefresher,
     required this.onAuthFailure,
     this.refreshDio,
+    this.retryDio,
     RefreshConfig? refreshConfig,
     RetryConfig? retryConfig,
     RefreshTokenLogger? logger,
@@ -40,9 +52,12 @@ class RefreshTokenInterceptor extends Interceptor {
        retryConfig = retryConfig ?? const RetryConfig(),
        logger = logger ?? const RefreshTokenLogger();
 
-  Future<Dio> _getRefreshDio() async {
-    return refreshDio ?? Dio();
-  }
+  Dio _getRefreshDio() => refreshDio ?? Dio();
+
+  Dio _getRetryDio() => retryDio ?? Dio();
+
+  bool _shouldSkipAuth(RequestOptions options) =>
+      options.extra[skipAuthKey] == true;
 
   @override
   void onRequest(
@@ -50,6 +65,12 @@ class RefreshTokenInterceptor extends Interceptor {
     RequestInterceptorHandler handler,
   ) async {
     try {
+      if (_shouldSkipAuth(options)) {
+        logger.debug('Skipping auth for request: ${options.uri}');
+        handler.next(options);
+        return;
+      }
+
       logger.debug('Processing request: ${options.uri}');
 
       final shouldProceed = await _attachAuthorizationAndMaybeRefresh(options);
@@ -79,42 +100,48 @@ class RefreshTokenInterceptor extends Interceptor {
     }
   }
 
-  Future<bool> _attachAuthorizationAndMaybeRefresh(
+  Future<bool> _attachAuthorizationAndMaybeRefresh(RequestOptions options) {
+    if (refreshConfig.parallelRefresh) {
+      return _attachAuthorizationAndMaybeRefreshUnlocked(options);
+    }
+
+    return _refreshLock.synchronized(
+      () => _attachAuthorizationAndMaybeRefreshUnlocked(options),
+    );
+  }
+
+  Future<bool> _attachAuthorizationAndMaybeRefreshUnlocked(
     RequestOptions options,
   ) async {
-    return await _refreshLock.synchronized(() async {
-      final credentials = await tokenStorage.read();
+    final credentials = await tokenStorage.read();
 
-      if (credentials == null) {
-        logger.info('No credentials found');
-        await onAuthFailure();
-        return false;
-      }
+    if (credentials == null) {
+      logger.info('No credentials found');
+      await onAuthFailure();
+      return false;
+    }
 
-      final needsRefresh = refreshConfig.proactiveRefresh
-          ? credentials.isAccessTokenExpiringSoon(
-              refreshConfig.expirationBuffer,
-            )
-          : credentials.isAccessTokenExpired;
+    final needsRefresh = refreshConfig.proactiveRefresh
+        ? credentials.isAccessTokenExpiringSoon(refreshConfig.expirationBuffer)
+        : credentials.isAccessTokenExpired;
 
-      if (!needsRefresh) {
-        logger.debug('Token is valid, attaching to request');
-        options.headers[refreshConfig.authorizationHeaderKey] =
-            credentials.authorizationHeaderValue;
-        return true;
-      }
+    if (!needsRefresh) {
+      logger.debug('Token is valid, attaching to request');
+      options.headers[refreshConfig.authorizationHeaderKey] =
+          credentials.authorizationHeaderValue;
+      return true;
+    }
 
-      logger.info('Token expired or expiring soon, refreshing...');
+    logger.info('Token expired or expiring soon, refreshing...');
 
-      if (credentials.isRefreshTokenExpired) {
-        logger.error('Refresh token is expired');
-        await tokenStorage.delete();
-        await onAuthFailure();
-        return false;
-      }
+    if (credentials.isRefreshTokenExpired) {
+      logger.error('Refresh token is expired');
+      await tokenStorage.delete();
+      await onAuthFailure();
+      return false;
+    }
 
-      return await _performTokenRefresh(credentials, options);
-    });
+    return _performTokenRefresh(credentials, options);
   }
 
   Future<bool> _performTokenRefresh(
@@ -125,7 +152,7 @@ class RefreshTokenInterceptor extends Interceptor {
       refreshConfig.onRefreshStart?.call();
       logger.info('Starting token refresh');
 
-      final dioClient = await _getRefreshDio();
+      final dioClient = _getRefreshDio();
 
       if (refreshConfig.refreshHeaders != null) {
         dioClient.options.headers.addAll(refreshConfig.refreshHeaders!);
@@ -133,7 +160,7 @@ class RefreshTokenInterceptor extends Interceptor {
 
       final newCreds = await Future.any([
         tokenRefresher(credentials.refreshToken, dioClient),
-        Future.delayed(
+        Future<Credentials?>.delayed(
           refreshConfig.refreshTimeout,
           () => throw TimeoutException('Token refresh timeout'),
         ),
@@ -146,13 +173,13 @@ class RefreshTokenInterceptor extends Interceptor {
             newCreds.authorizationHeaderValue;
         refreshConfig.onRefreshSuccess?.call(newCreds);
         return true;
-      } else {
-        logger.error('Token refresh returned null');
-        await tokenStorage.delete();
-        refreshConfig.onRefreshFailure?.call('Refresh returned null');
-        await onAuthFailure();
-        return false;
       }
+
+      logger.error('Token refresh returned null');
+      await tokenStorage.delete();
+      refreshConfig.onRefreshFailure?.call('Refresh returned null');
+      await onAuthFailure();
+      return false;
     } catch (e, st) {
       logger.error('Token refresh failed', e, st);
       await tokenStorage.delete();
@@ -168,6 +195,11 @@ class RefreshTokenInterceptor extends Interceptor {
     final options = err.requestOptions;
 
     logger.debug('Error intercepted: ${err.type}, status: $status');
+
+    if (_shouldSkipAuth(options)) {
+      handler.next(err);
+      return;
+    }
 
     if (status == HttpStatus.unauthorized) {
       logger.info('Unauthorized error, attempting token refresh');
@@ -195,23 +227,29 @@ class RefreshTokenInterceptor extends Interceptor {
     handler.next(err);
   }
 
-  Future<bool> _handleUnauthorizedError(RequestOptions options) async {
-    return await _refreshLock.synchronized(() async {
-      final credentials = await tokenStorage.read();
-      if (credentials == null) {
-        logger.info('No credentials found during error handling');
-        return false;
-      }
+  Future<bool> _handleUnauthorizedError(RequestOptions options) {
+    if (refreshConfig.parallelRefresh) {
+      return _handleUnauthorizedErrorUnlocked(options);
+    }
 
-      if (credentials.isRefreshTokenExpired) {
-        logger.error('Refresh token expired during error handling');
-        await tokenStorage.delete();
-        await onAuthFailure();
-        return false;
-      }
+    return _refreshLock.synchronized(() => _handleUnauthorizedErrorUnlocked(options));
+  }
 
-      return await _performTokenRefresh(credentials, options);
-    });
+  Future<bool> _handleUnauthorizedErrorUnlocked(RequestOptions options) async {
+    final credentials = await tokenStorage.read();
+    if (credentials == null) {
+      logger.info('No credentials found during error handling');
+      return false;
+    }
+
+    if (credentials.isRefreshTokenExpired) {
+      logger.error('Refresh token expired during error handling');
+      await tokenStorage.delete();
+      await onAuthFailure();
+      return false;
+    }
+
+    return _performTokenRefresh(credentials, options);
   }
 
   Future<void> _retryRequestWithPolicy(
@@ -229,13 +267,19 @@ class RefreshTokenInterceptor extends Interceptor {
           logger.debug('Retry attempt $attemptCount for ${options.uri}');
 
           final credentials = await tokenStorage.read();
+          final headers = Map<String, dynamic>.from(options.headers);
           if (credentials != null) {
-            options.headers[refreshConfig.authorizationHeaderKey] =
+            headers[refreshConfig.authorizationHeaderKey] =
                 credentials.authorizationHeaderValue;
           }
 
-          final dio = Dio();
-          return await dio.fetch(options);
+          final requestOptions = options.copyWith(
+            headers: headers,
+            extra: Map<String, dynamic>.from(options.extra)
+              ..[skipAuthKey] = true,
+          );
+
+          return _getRetryDio().fetch(requestOptions);
         },
         shouldRetry: (error) {
           if (error is DioException) {
@@ -253,11 +297,11 @@ class RefreshTokenInterceptor extends Interceptor {
     }
   }
 
-  /// Manually trigger a token refresh
+  /// Manually trigger a token refresh.
   Future<bool> refreshToken() async {
     logger.info('Manual token refresh triggered');
 
-    return await _refreshLock.synchronized(() async {
+    final refreshAction = () async {
       final credentials = await tokenStorage.read();
       if (credentials == null) {
         logger.error('No credentials found for manual refresh');
@@ -272,11 +316,17 @@ class RefreshTokenInterceptor extends Interceptor {
       }
 
       final options = RequestOptions(path: '');
-      return await _performTokenRefresh(credentials, options);
-    });
+      return _performTokenRefresh(credentials, options);
+    };
+
+    if (refreshConfig.parallelRefresh) {
+      return refreshAction();
+    }
+
+    return _refreshLock.synchronized(refreshAction);
   }
 
-  /// Clear all stored tokens
+  /// Clear all stored tokens.
   Future<void> clearTokens() async {
     logger.info('Clearing all tokens');
     await tokenStorage.delete();
