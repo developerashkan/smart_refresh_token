@@ -3,7 +3,7 @@ description: Example app for smart_refresh_token
 publish_to: "none"
 
 environment:
-  sdk: ">=3.9.0 <4.0.0"
+  sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -11,6 +11,8 @@ dependencies:
 
   smart_refresh_token:
     path: ..
+  dio: ^5.9.0
+  flutter_secure_storage: ^9.2.4
 
 flutter:
   uses-material-design: true
