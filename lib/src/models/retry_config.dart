@@ -1,32 +1,34 @@
+import 'dart:math' as math;
+
 import 'package:dio/dio.dart';
 
-/// Configuration for retry behavior
+/// Configuration for retry behavior.
 class RetryConfig {
-  /// Maximum number of retry attempts
+  /// Maximum number of retry attempts.
   final int maxRetries;
 
-  /// Base delay between retries
+  /// Base delay between retries.
   final Duration baseDelay;
 
-  /// Maximum delay between retries
+  /// Maximum delay between retries.
   final Duration maxDelay;
 
-  /// Exponential backoff multiplier
+  /// Exponential backoff multiplier.
   final double backoffMultiplier;
 
-  /// Jitter factor (0.0 to 1.0) for randomizing delays
+  /// Jitter factor (0.0 to 1.0) for randomizing delays.
   final double jitter;
 
-  /// HTTP status codes that should trigger a retry
+  /// HTTP status codes that should trigger a retry.
   final Set<int> retryableStatusCodes;
 
-  /// Dio exception types that should trigger a retry
+  /// Dio exception types that should trigger a retry.
   final Set<DioExceptionType> retryableExceptionTypes;
 
-  /// Custom condition to determine if a request should be retried
+  /// Custom condition to determine if a request should be retried.
   final bool Function(DioException error, int attemptCount)? retryCondition;
 
-  /// Callback when a retry is about to happen
+  /// Callback when a retry is about to happen.
   final void Function(DioException error, int attemptCount, Duration delay)?
   onRetry;
 
@@ -45,9 +47,11 @@ class RetryConfig {
     },
     this.retryCondition,
     this.onRetry,
-  });
+  }) : assert(maxRetries >= 0),
+       assert(backoffMultiplier >= 1),
+       assert(jitter >= 0 && jitter <= 1);
 
-  /// Creates a conservative retry configuration
+  /// Creates a conservative retry configuration.
   factory RetryConfig.conservative() {
     return const RetryConfig(
       maxRetries: 2,
@@ -56,7 +60,7 @@ class RetryConfig {
     );
   }
 
-  /// Creates an aggressive retry configuration
+  /// Creates an aggressive retry configuration.
   factory RetryConfig.aggressive() {
     return const RetryConfig(
       maxRetries: 5,
@@ -65,41 +69,41 @@ class RetryConfig {
     );
   }
 
-  /// Creates a configuration with no retries
+  /// Creates a configuration with no retries.
   factory RetryConfig.noRetry() {
     return const RetryConfig(maxRetries: 0);
   }
 
-  /// Calculates the delay for a specific retry attempt
+  /// Calculates the delay for a specific retry attempt.
   Duration calculateDelay(int attemptCount) {
     if (attemptCount <= 0) return Duration.zero;
 
-    var delay =
-        baseDelay.inMilliseconds * (backoffMultiplier * (attemptCount - 1));
+    var delayMs =
+        baseDelay.inMilliseconds * math.pow(backoffMultiplier, attemptCount - 1);
 
     if (jitter > 0) {
-      final jitterAmount = delay * jitter;
-      final random = DateTime.now().millisecondsSinceEpoch % 1000 / 1000.0;
-      delay += (random * 2 - 1) * jitterAmount;
+      final jitterAmount = delayMs * jitter;
+      final randomFactor = math.Random().nextDouble() * 2 - 1;
+      delayMs += randomFactor * jitterAmount;
     }
 
-    delay = delay.clamp(0, maxDelay.inMilliseconds.toDouble());
+    final clamped = delayMs.clamp(0, maxDelay.inMilliseconds.toDouble());
 
-    return Duration(milliseconds: delay.round());
+    return Duration(milliseconds: clamped.round());
   }
 
-  /// Determines if an error should trigger a retry
+  /// Determines if an error should trigger a retry.
   bool shouldRetry(DioException error, int attemptCount) {
     if (attemptCount >= maxRetries) return false;
 
-    // Check custom condition first
     if (retryCondition != null) {
       return retryCondition!(error, attemptCount);
     }
 
-    if (error.response?.statusCode != null &&
-        retryableStatusCodes.contains(error.response!.statusCode)) {
-      return true;
+    if (error.response?.statusCode case final statusCode?) {
+      if (retryableStatusCodes.contains(statusCode)) {
+        return true;
+      }
     }
 
     return retryableExceptionTypes.contains(error.type);

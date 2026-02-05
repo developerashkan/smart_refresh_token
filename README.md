@@ -1,24 +1,13 @@
 # smart_refresh_token
 
-A simple, production-focused Flutter package for **automatic Dio access-token refresh**.
+A production-focused Flutter/Dart package for **automatic Dio access-token refresh**.
 
-`smart_refresh_token` solves common auth pain points for mobile teams:
-- stale/expired token race conditions,
-- duplicated refresh calls from concurrent requests,
-- retrying 401 requests after refresh,
-- and clean opt-out for public endpoints.
-
-## Highlights
-
-- ✅ Automatic auth header injection.
-- ✅ Automatic refresh when token is expired (or near expiry).
-- ✅ Single-flight refresh lock to prevent multiple simultaneous refresh calls.
-- ✅ Optional 401 retry flow.
-- ✅ Easy skip-auth flag for public endpoints.
-- ✅ Storage-agnostic design (`TokenStorage` abstraction).
-- ✅ Built-in `InMemoryTokenStorage` for demos, tests, and quick starts.
-
----
+`smart_refresh_token` handles real auth edge-cases out of the box:
+- concurrent request refresh storms,
+- proactive token refresh before expiry,
+- automatic retry with exponential backoff,
+- simple opt-out for public endpoints,
+- and pluggable token storage.
 
 ## Install
 
@@ -27,13 +16,9 @@ dependencies:
   smart_refresh_token: ^0.1.0
 ```
 
-Then run:
-
 ```bash
 flutter pub get
 ```
-
----
 
 ## Quick start
 
@@ -68,42 +53,15 @@ dio.interceptors.add(
     onAuthFailure: () async {
       // e.g. navigate to login, clear app state
     },
-    refreshBeforeExpiry: const Duration(seconds: 45),
+    refreshConfig: const RefreshConfig(
+      expirationBuffer: Duration(seconds: 45),
+    ),
+    retryConfig: RetryConfig.conservative(),
   ),
 );
 ```
 
----
-
-## Core API
-
-### `Credentials`
-- `toJson()` / `fromJson(...)` helpers.
-- `authorizationHeaderValue` convenience getter.
-- `isAccessTokenExpired(refreshBefore: ...)` for proactive refresh.
-
-### `TokenStorage`
-Implement these 3 methods:
-- `read()`
-- `write(credentials)`
-- `delete()`
-
-You can use:
-- `InMemoryTokenStorage` (included), or
-- your own secure storage implementation (see `lib/example/main.dart`).
-
-### `RefreshTokenInterceptor`
-Important options:
-- `refreshBeforeExpiry` (default: 30s)
-- `retryOnUnauthorized` (default: true)
-- `refreshDio` and `retryDio` for advanced networking setups
-- `authorizationHeaderKey` (default: `Authorization`)
-
----
-
 ## Public endpoints (skip auth)
-
-For endpoints that must not include auth headers:
 
 ```dart
 await dio.get(
@@ -114,24 +72,57 @@ await dio.get(
 );
 ```
 
----
+## Main APIs
 
-## Why this package is useful
+### `Credentials`
+- `toJson()` / `fromJson(...)`
+- `authorizationHeaderValue`
+- `isAccessTokenExpired`
+- `isAccessTokenExpiringSoon(buffer)`
 
-It reduces boilerplate and prevents common real-world auth bugs:
-- refresh storms from parallel requests,
-- token expiry timing races,
-- repetitive retry logic in each API method,
-- and inconsistent auth failure handling across features.
+### `TokenStorage`
+Implement:
+- `read()`
+- `write(credentials)`
+- `delete()`
 
----
+Built-in:
+- `InMemoryTokenStorage` (great for tests and simple apps)
 
-## Example secure storage implementation
+### `RefreshTokenInterceptor`
+Constructor options:
+- `tokenStorage`, `tokenRefresher`, `onAuthFailure` (required)
+- `refreshConfig` for refresh behavior
+- `retryConfig` for retry strategy
+- `refreshDio` for dedicated refresh transport
+- `retryDio` for dedicated retry transport
+- `logger` for package logging
 
-A complete `flutter_secure_storage` implementation is provided at:
-- `lib/example/main.dart`
+### `RefreshConfig`
+- `expirationBuffer`
+- `proactiveRefresh`
+- `parallelRefresh`
+- `refreshTimeout`
+- `authorizationHeaderKey`
+- refresh callbacks: `onRefreshStart`, `onRefreshSuccess`, `onRefreshFailure`
 
----
+### `RetryConfig`
+- `maxRetries`
+- `baseDelay`, `maxDelay`
+- `backoffMultiplier`, `jitter`
+- `retryableStatusCodes`
+- `retryableExceptionTypes`
+
+## Why teams use it
+
+- Prevents duplicate refresh calls during traffic spikes.
+- Centralizes auth failure behavior.
+- Reduces repetitive endpoint-level retry and auth code.
+- Works with any storage backend through `TokenStorage`.
+
+## Example app
+
+See `example/lib/main.dart` for a complete Flutter demo.
 
 ## License
 
