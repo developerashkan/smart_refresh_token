@@ -7,6 +7,7 @@ abstract class TokenStorage {
   /// Reads credentials from storage.
   Future<Credentials?> read();
 
+
   /// Writes credentials to storage.
   Future<void> write(Credentials credentials);
 
