@@ -67,7 +67,9 @@ void main() {
           return ResponseBody.fromString(
             jsonEncode({'ok': true}),
             200,
-            headers: {Headers.contentTypeHeader: [Headers.jsonContentType]},
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
           );
         })
         ..interceptors.add(
@@ -151,9 +153,7 @@ void main() {
 
       await dio.get(
         'https://example.com/public',
-        options: Options(
-          extra: {RefreshTokenInterceptor.skipAuthKey: true},
-        ),
+        options: Options(extra: {RefreshTokenInterceptor.skipAuthKey: true}),
       );
 
       expect(authFailureCalls, 0);

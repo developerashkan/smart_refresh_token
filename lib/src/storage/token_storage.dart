@@ -21,7 +21,7 @@ abstract class TokenStorage {
 }
 
 /// Simple in-memory token storage useful for tests and quick starts.
-class InMemoryTokenStorage implements TokenStorage {
+class InMemoryTokenStorage extends TokenStorage {
   Credentials? _credentials;
 
   InMemoryTokenStorage({Credentials? initialCredentials})

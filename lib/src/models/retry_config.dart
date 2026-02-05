@@ -79,7 +79,8 @@ class RetryConfig {
     if (attemptCount <= 0) return Duration.zero;
 
     var delayMs =
-        baseDelay.inMilliseconds * math.pow(backoffMultiplier, attemptCount - 1);
+        baseDelay.inMilliseconds *
+        math.pow(backoffMultiplier, attemptCount - 1);
 
     if (jitter > 0) {
       final jitterAmount = delayMs * jitter;

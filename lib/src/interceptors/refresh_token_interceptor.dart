@@ -232,7 +232,9 @@ class RefreshTokenInterceptor extends Interceptor {
       return _handleUnauthorizedErrorUnlocked(options);
     }
 
-    return _refreshLock.synchronized(() => _handleUnauthorizedErrorUnlocked(options));
+    return _refreshLock.synchronized(
+      () => _handleUnauthorizedErrorUnlocked(options),
+    );
   }
 
   Future<bool> _handleUnauthorizedErrorUnlocked(RequestOptions options) async {
