@@ -1,11 +1,13 @@
 import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:smart_refresh_token/smart_refresh_token.dart';
-import 'package:dio/dio.dart';
 
-// Implementation of TokenStorage
+/// Production-ready storage backed by flutter_secure_storage.
 class SecureTokenStorage implements TokenStorage {
   final FlutterSecureStorage secureStorage;
+
   SecureTokenStorage({required this.secureStorage});
 
   static const _kKey = 'app_credentials_v1';
@@ -15,32 +17,22 @@ class SecureTokenStorage implements TokenStorage {
 
   @override
   Future<Credentials?> read() async {
-    final s = await secureStorage.read(key: _kKey);
-    if (s == null) return null;
-    final m = json.decode(s) as Map<String, dynamic>;
-    return Credentials(
-      accessToken: m['accessToken'],
-      refreshToken: m['refreshToken'],
-      accessTokenExpireAt: DateTime.parse(m['accessTokenExpireAt']).toUtc(),
-      refreshTokenExpireAt: m['refreshTokenExpireAt'] != null
-          ? DateTime.parse(m['refreshTokenExpireAt']).toUtc()
-          : null,
-    );
+    final value = await secureStorage.read(key: _kKey);
+    if (value == null) return null;
+
+    return Credentials.fromJson(json.decode(value) as Map<String, dynamic>);
   }
 
   @override
   Future<void> write(Credentials credentials) {
-    final m = {
-      'accessToken': credentials.accessToken,
-      'refreshToken': credentials.refreshToken,
-      'accessTokenExpireAt': credentials.accessTokenExpireAt.toIso8601String(),
-      'refreshTokenExpireAt': credentials.refreshTokenExpireAt?.toIso8601String(),
-    };
-    return secureStorage.write(key: _kKey, value: json.encode(m));
+    return secureStorage.write(
+      key: _kKey,
+      value: json.encode(credentials.toJson()),
+    );
   }
 }
 
-// Example token refresher
+/// Example token refresher. Adapt to your API schema.
 Future<Credentials?> myRefresher(String refreshToken, Dio client) async {
   try {
     final resp = await client.post(
@@ -48,38 +40,47 @@ Future<Credentials?> myRefresher(String refreshToken, Dio client) async {
       data: {'refresh': refreshToken},
     );
 
-    if (resp.statusCode == 200) {
-      final data = resp.data as Map<String, dynamic>;
-      // parse according to your API shape:
-      final newAccess = data['access_token'] ?? data['token'] ?? data['access'];
-      final newRefresh = data['refresh'] ?? refreshToken;
-      final accessExpiresIn = data['access_expires_in'] ?? 3600; // seconds
-      final refreshExpiresIn = data['refresh_expires_in']; // optional
+    if (resp.statusCode != 200) return null;
 
-      return Credentials(
-        accessToken: newAccess as String,
-        refreshToken: newRefresh as String,
-        accessTokenExpireAt: DateTime.now().toUtc().add(Duration(seconds: accessExpiresIn as int)),
-        refreshTokenExpireAt: refreshExpiresIn != null
-            ? DateTime.now().toUtc().add(Duration(seconds: refreshExpiresIn as int))
-            : null,
-      );
-    }
-  } catch (e) {
-    // network error or parse error -> return null
+    final data = resp.data as Map<String, dynamic>;
+    final newAccess = data['access_token'] ?? data['token'] ?? data['access'];
+    if (newAccess is! String) return null;
+
+    final newRefresh = data['refresh'] as String? ?? refreshToken;
+    final accessExpiresIn = data['access_expires_in'] as int? ?? 3600;
+    final refreshExpiresIn = data['refresh_expires_in'] as int?;
+
+    return Credentials(
+      accessToken: newAccess,
+      refreshToken: newRefresh,
+      accessTokenExpireAt:
+          DateTime.now().toUtc().add(Duration(seconds: accessExpiresIn)),
+      refreshTokenExpireAt: refreshExpiresIn == null
+          ? null
+          : DateTime.now().toUtc().add(Duration(seconds: refreshExpiresIn)),
+    );
+  } catch (_) {
+    return null;
   }
-  return null;
 }
 
-// When creating your Dio client:
 final tokenStorage = SecureTokenStorage(secureStorage: FlutterSecureStorage());
+
 final interceptor = RefreshTokenInterceptor(
   tokenStorage: tokenStorage,
   tokenRefresher: myRefresher,
   onAuthFailure: () async {
-    // app-specific: navigate to login, clear state, etc.
+    // app-specific: navigate to login, clear local state, etc.
   },
+  // Refresh a little before expiry to avoid race conditions.
+  refreshBeforeExpiry: const Duration(seconds: 45),
 );
 
 final dioAuth = Dio(BaseOptions(baseUrl: 'https://api.yourdomain.com'))
   ..interceptors.add(interceptor);
+
+/// Example for unauthenticated requests:
+Future<Response<dynamic>> fetchPublicFeed() {
+  final options = Options(extra: {RefreshTokenInterceptor.skipAuthKey: true});
+  return dioAuth.get('/public/feed', options: options);
+}
