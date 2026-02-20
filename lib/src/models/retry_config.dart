@@ -30,7 +30,7 @@ class RetryConfig {
 
   /// Callback when a retry is about to happen.
   final void Function(DioException error, int attemptCount, Duration delay)?
-  onRetry;
+      onRetry;
 
   const RetryConfig({
     this.maxRetries = 3,
@@ -47,9 +47,9 @@ class RetryConfig {
     },
     this.retryCondition,
     this.onRetry,
-  }) : assert(maxRetries >= 0),
-       assert(backoffMultiplier >= 1),
-       assert(jitter >= 0 && jitter <= 1);
+  })  : assert(maxRetries >= 0),
+        assert(backoffMultiplier >= 1),
+        assert(jitter >= 0 && jitter <= 1);
 
   /// Creates a conservative retry configuration.
   factory RetryConfig.conservative() {
@@ -78,8 +78,7 @@ class RetryConfig {
   Duration calculateDelay(int attemptCount) {
     if (attemptCount <= 0) return Duration.zero;
 
-    var delayMs =
-        baseDelay.inMilliseconds *
+    var delayMs = baseDelay.inMilliseconds *
         math.pow(backoffMultiplier, attemptCount - 1);
 
     if (jitter > 0) {
@@ -120,7 +119,7 @@ class RetryConfig {
     Set<DioExceptionType>? retryableExceptionTypes,
     bool Function(DioException error, int attemptCount)? retryCondition,
     void Function(DioException error, int attemptCount, Duration delay)?
-    onRetry,
+        onRetry,
   }) {
     return RetryConfig(
       maxRetries: maxRetries ?? this.maxRetries,

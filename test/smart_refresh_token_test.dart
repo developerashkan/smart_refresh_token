@@ -31,11 +31,11 @@ void main() {
         accessToken: 'access123',
         refreshToken: 'refresh123',
         accessTokenExpireAt: DateTime.now().toUtc().add(
-          const Duration(hours: 1),
-        ),
+              const Duration(hours: 1),
+            ),
         refreshTokenExpireAt: DateTime.now().toUtc().add(
-          const Duration(days: 1),
-        ),
+              const Duration(days: 1),
+            ),
       );
 
       await storage.write(creds);
@@ -55,8 +55,8 @@ void main() {
           accessToken: 'valid-token',
           refreshToken: 'refresh-token',
           accessTokenExpireAt: DateTime.now().toUtc().add(
-            const Duration(hours: 1),
-          ),
+                const Duration(hours: 1),
+              ),
         ),
       );
 
@@ -91,11 +91,11 @@ void main() {
           accessToken: 'expired-token',
           refreshToken: 'refresh-token',
           accessTokenExpireAt: DateTime.now().toUtc().subtract(
-            const Duration(minutes: 1),
-          ),
+                const Duration(minutes: 1),
+              ),
           refreshTokenExpireAt: DateTime.now().toUtc().add(
-            const Duration(days: 1),
-          ),
+                const Duration(days: 1),
+              ),
         ),
       );
 
@@ -116,11 +116,11 @@ void main() {
                 accessToken: 'new-token',
                 refreshToken: 'new-refresh',
                 accessTokenExpireAt: DateTime.now().toUtc().add(
-                  const Duration(hours: 1),
-                ),
+                      const Duration(hours: 1),
+                    ),
                 refreshTokenExpireAt: DateTime.now().toUtc().add(
-                  const Duration(days: 30),
-                ),
+                      const Duration(days: 30),
+                    ),
               );
             },
             onAuthFailure: () async {},

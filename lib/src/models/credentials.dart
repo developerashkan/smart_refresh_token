@@ -91,12 +91,12 @@ class Credentials extends Equatable {
 
   @override
   List<Object?> get props => [
-    accessToken,
-    refreshToken,
-    accessTokenExpireAt,
-    refreshTokenExpireAt,
-    metadata,
-  ];
+        accessToken,
+        refreshToken,
+        accessTokenExpireAt,
+        refreshTokenExpireAt,
+        metadata,
+      ];
 
   @override
   String toString() {

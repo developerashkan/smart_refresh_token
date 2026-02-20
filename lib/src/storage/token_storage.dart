@@ -25,7 +25,7 @@ class InMemoryTokenStorage extends TokenStorage {
   Credentials? _credentials;
 
   InMemoryTokenStorage({Credentials? initialCredentials})
-    : _credentials = initialCredentials;
+      : _credentials = initialCredentials;
 
   @override
   Future<void> delete() async {

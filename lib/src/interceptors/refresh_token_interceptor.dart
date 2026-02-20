@@ -12,8 +12,8 @@ import '../utils/logger.dart';
 import '../utils/retry_policy.dart';
 
 /// Callback type for token refresh.
-typedef TokenRefresher =
-    Future<Credentials?> Function(String refreshToken, Dio client);
+typedef TokenRefresher = Future<Credentials?> Function(
+    String refreshToken, Dio client);
 
 /// Callback type for authentication failure.
 typedef OnAuthFailure = FutureOr<void> Function();
@@ -48,9 +48,9 @@ class RefreshTokenInterceptor extends Interceptor {
     RefreshConfig? refreshConfig,
     RetryConfig? retryConfig,
     RefreshTokenLogger? logger,
-  }) : refreshConfig = refreshConfig ?? const RefreshConfig(),
-       retryConfig = retryConfig ?? const RetryConfig(),
-       logger = logger ?? const RefreshTokenLogger();
+  })  : refreshConfig = refreshConfig ?? const RefreshConfig(),
+        retryConfig = retryConfig ?? const RetryConfig(),
+        logger = logger ?? const RefreshTokenLogger();
 
   Dio _getRefreshDio() => refreshDio ?? Dio();
 
