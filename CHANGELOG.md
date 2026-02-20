@@ -1,3 +1,5 @@
+## [0.1.1] - 2026-02-20
+- Compatible with latest Dart version
 ## [0.1.0] - 2026-02-05
 ### Added
 - Added `InMemoryTokenStorage` for quick starts and tests.

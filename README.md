@@ -13,7 +13,7 @@ A production-focused Flutter/Dart package for **automatic Dio access-token refre
 
 ```yaml
 dependencies:
-  smart_refresh_token: ^0.1.0
+  smart_refresh_token: ^0.1.1
 ```
 
 ```bash
