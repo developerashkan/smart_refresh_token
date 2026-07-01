@@ -75,7 +75,7 @@ void main() {
         ..interceptors.add(
           RefreshTokenInterceptor(
             tokenStorage: storage,
-            tokenRefresher: (_, __) async => null,
+            tokenRefresher: (_, _) async => null,
             onAuthFailure: () async {},
           ),
         );
@@ -110,7 +110,7 @@ void main() {
         ..interceptors.add(
           RefreshTokenInterceptor(
             tokenStorage: storage,
-            tokenRefresher: (_, __) async {
+            tokenRefresher: (_, _) async {
               refreshCallCount++;
               return Credentials(
                 accessToken: 'new-token',
@@ -144,7 +144,7 @@ void main() {
         ..interceptors.add(
           RefreshTokenInterceptor(
             tokenStorage: InMemoryTokenStorage(),
-            tokenRefresher: (_, __) async => null,
+            tokenRefresher: (_, _) async => null,
             onAuthFailure: () async {
               authFailureCalls++;
             },

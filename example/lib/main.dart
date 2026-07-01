@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:smart_refresh_token/smart_refresh_token.dart';
 import 'package:dio/dio.dart';
-import 'package:smart_refresh_token/src/utils/logger.dart';
 
 void main() {
   runApp(const MyApp());

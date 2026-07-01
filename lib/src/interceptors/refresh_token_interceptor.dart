@@ -303,7 +303,7 @@ class RefreshTokenInterceptor extends Interceptor {
   Future<bool> refreshToken() async {
     logger.info('Manual token refresh triggered');
 
-    final refreshAction = () async {
+    Future<bool> refreshAction() async {
       final credentials = await tokenStorage.read();
       if (credentials == null) {
         logger.error('No credentials found for manual refresh');
@@ -319,7 +319,7 @@ class RefreshTokenInterceptor extends Interceptor {
 
       final options = RequestOptions(path: '');
       return _performTokenRefresh(credentials, options);
-    };
+    }
 
     if (refreshConfig.parallelRefresh) {
       return refreshAction();

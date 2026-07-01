@@ -1,3 +1,9 @@
+## [0.1.2] - 2026-07-01
+- Updated to latest Flutter and Dart versions.
+- Upgraded dependencies: `dio`, `synchronized`, `equatable`.
+- Exported `logger.dart` for public use.
+- Fixed various linting issues and improved code quality.
+
 ## [0.1.1] - 2026-02-20
 - Compatible with latest Dart version
 ## [0.1.0] - 2026-02-05
